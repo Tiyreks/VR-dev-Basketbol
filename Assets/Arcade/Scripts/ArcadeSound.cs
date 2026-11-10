@@ -4,7 +4,7 @@ using UnityEngine;
 // Tiny synthesized sounds so the arcade has audio without any audio files.
 public static class ArcadeSound
 {
-    public enum Kind { Start, Score, End, Fail, Ticket, Bounce, Swish, Tick, Buzzer }
+    public enum Kind { Start, Score, End, Fail, Ticket, Bounce, Swish, Tick, Buzzer, Quack, Clang }
 
     const int SampleRate = 44100;
 
@@ -35,6 +35,8 @@ public static class ArcadeSound
             case Kind.Swish: data = Swish(); break;
             case Kind.Tick: data = Notes(new[] { 1400f }, 0.04f); break;
             case Kind.Buzzer: data = Buzzer(); break;
+            case Kind.Quack: data = Quack(); break;
+            case Kind.Clang: data = Clang(); break;
             default: data = Notes(new[] { 1046f, 1318f, 1568f }, 0.07f); break;
         }
 
@@ -98,6 +100,47 @@ public static class ArcadeSound
             smoothed += (noise - smoothed) * 0.35f;
             float envelope = Mathf.Sin(k * Mathf.PI) * (1f - k);
             data[i] = smoothed * envelope * 0.8f;
+        }
+
+        return data;
+    }
+
+    // Nasal, falling "vak" for a hit duck.
+    private static float[] Quack()
+    {
+        int length = (int)(SampleRate * 0.25f);
+        float[] data = new float[length];
+        float phase = 0f;
+
+        for (int i = 0; i < length; i++)
+        {
+            float k = i / (float)length;
+            float frequency = Mathf.Lerp(520f, 300f, k) + Mathf.Sin(k * 60f) * 25f;
+            phase += frequency / SampleRate;
+            // Sawtooth with a few harmonics for the buzzy duck voice.
+            float wave = (Mathf.Repeat(phase, 1f) * 2f - 1f) * 0.6f + Mathf.Sin(phase * 2f * Mathf.PI * 3f) * 0.2f;
+            float envelope = Mathf.Min(1f, k * 20f) * (1f - k);
+            data[i] = wave * envelope * 0.35f;
+        }
+
+        return data;
+    }
+
+    // Metallic ring for a can that gets hit.
+    private static float[] Clang()
+    {
+        int length = (int)(SampleRate * 0.3f);
+        float[] data = new float[length];
+        float[] partials = { 1200f, 1870f, 2650f, 3410f };
+
+        for (int i = 0; i < length; i++)
+        {
+            float t = i / (float)SampleRate;
+            float k = i / (float)length;
+            float wave = 0f;
+            for (int p = 0; p < partials.Length; p++)
+                wave += Mathf.Sin(2f * Mathf.PI * partials[p] * t) / (p + 1);
+            data[i] = wave * Mathf.Exp(-k * 7f) * 0.25f;
         }
 
         return data;

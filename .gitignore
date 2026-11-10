@@ -77,3 +77,4 @@ crashlytics-build.properties
 # Course handouts (teacher's material) stay local only
 /Assets/Ödevler/
 /Assets/Ödevler.meta
+OyunOdasi.request

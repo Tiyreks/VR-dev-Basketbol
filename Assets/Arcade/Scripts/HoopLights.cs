@@ -42,6 +42,9 @@ public class HoopLights : MonoBehaviour
 
         for (int i = 0; i < bulbs.Length; i++)
         {
+            if (bulbs[i] == null)
+                continue;
+
             // Distance (around the ring) from the moving "head" of the chase.
             float distance = Mathf.Repeat(chasePosition - i, bulbs.Length);
             float chase = Mathf.Max(0f, 1f - distance / 3f);
