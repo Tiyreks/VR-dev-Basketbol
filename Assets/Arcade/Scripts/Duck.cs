@@ -17,7 +17,9 @@ public class Duck : MonoBehaviour
     public Transform pivot;
     public Transform model;
 
-    public float downTime = 1.5f;
+    public float downTime = 1.2f;
+    // Bu hızdan yavaş dokunuşlar sayılmaz (çok düşük = çok kolay).
+    public float hitSpeed = 0.3f;
 
     [HideInInspector] public DuckGame game;
 
@@ -77,7 +79,7 @@ public class Duck : MonoBehaviour
         if (other == null || other.isKinematic)
             return;
 
-        if (collision.relativeVelocity.magnitude < 0.8f)
+        if (collision.relativeVelocity.magnitude < hitSpeed)
             return;
 
         Hit(collision.GetContact(0).point);

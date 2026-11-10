@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// Kutu Devirme: kuledeki kutulara top at. Yere düşen her kutu 1 puan.
+// Kutu Devirme: kuledeki kutulara top at. Masadan yere düşen her kutu 1 puan.
 // Hepsi düşerse +3 bonus. Kulede yerinde duran kutu kalmayınca kule yeniden dizilir.
 public class CanGame : MiniGame
 {
@@ -86,7 +86,8 @@ public class CanGame : MiniGame
         ArcadeSound.Play(ArcadeSound.Kind.Ticket, transform.position, 0.5f);
     }
 
-    protected override void OnGameStarted()
+    // Tur, ilk düşen kutuyla başladığı için başlangıçta kule bozulmaz; tur bitince yeniden dizilir.
+    protected override void OnGameEnded()
     {
         RebuildTower();
     }
