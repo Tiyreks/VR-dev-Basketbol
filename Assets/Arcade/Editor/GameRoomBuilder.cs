@@ -22,6 +22,7 @@ public static class GameRoomBuilder
     const string PrefabFolder = "Assets/Arcade/Prefabs";
     const float Y0 = -0.15f; // zemin yüksekliği
     const float PanelScale = 0.0024f;
+    const float PanelHeight = 220f; // sadece başlık + skor
 
     // Kapı boşluğu (güney duvarı, z = -6.1).
     const float DoorLeft = 3.85f, DoorRight = 5.15f, DoorHeight = 2.25f, SouthZ = -6.1f;
@@ -123,61 +124,72 @@ public static class GameRoomBuilder
         }
         Transform root = rootGo.transform;
 
-        // Basketbol: sadece panel, duvara (potanın arkasına) taşınır.
-        Transform basket = root.Find("BASKETBOL");
-        if (basket != null)
+        // Sadece bu adımlar yapılır; başka hiçbir şey eklenmez veya geri getirilmez
+        // (elle silinen yazılar/objeler silinmiş kalır, renkler ve tabelalar korunur).
+
+        // 1) Panellerde sadece başlık ve skor kalsın.
+        foreach (string booth in new[] { "BASKETBOL", "ORDEK_AVI", "KUTU_DEVIRME" })
         {
-            DeleteChildren(basket, "Panel", "Panel_Ayagi", "Panel_Arka");
-            BuildPanel(basket.GetComponent<MiniGame>(), basket, BasketPanelPos, -90f, new Color(0.45f, 0.25f, 0.1f));
+            Transform b = root.Find(booth);
+            if (b != null)
+                ShrinkPanelToScore(b);
         }
 
-        // Ördek Avı: az, büyük, yavaş ve yakın ördekler + arka panoda panel.
+        // 2) Ördek sayısı artar (aynı büyüklükte). Raylar ve dalgalar olduğu gibi kalır.
         Transform duck = root.Find("ORDEK_AVI");
         if (duck != null)
         {
-            DeleteChildren(duck, "Panel", "Panel_Ayagi", "Panel_Arka", "Ordekler", "Ray_", "Dalga_");
-            BuildDuckTargets(duck);
-            DuckGame dg = duck.GetComponent<DuckGame>();
-            dg.howToPlay = DuckHowTo;
-            BuildPanel(dg, duck, DuckPanelPos, 0f, new Color(0.1f, 0.3f, 0.55f));
+            DeleteChildren(duck, "Ordekler");
+            BuildDucks(duck);
         }
 
-        // Kutu Devirme: tezgah kuleye yaklaşır, kutular büyür/hafifler + perdede panel.
-        Transform can = root.Find("KUTU_DEVIRME");
-        if (can != null)
+        // 3) Atari makinesi kaldırılır.
+        DeleteChildren(root, "ATARI_MAKINESI");
+
+        Save(scene, "Oda yerinde güncellendi: sadece skor, daha çok ördek, atari kaldırıldı.");
+    }
+
+    // Var olan paneli yerinde küçültür: süre/rekor/açıklama yazıları silinir, başlık ve skor ortalanır.
+    // Yazıların renk/yazı tipi ayarlarına dokunulmaz.
+    static void ShrinkPanelToScore(Transform booth)
+    {
+        Transform panel = booth.Find("Panel");
+        if (panel == null)
+            return;
+
+        DeleteChildren(panel, "Sure", "Rekor", "Bilgi");
+
+        RectTransform rt = (RectTransform)panel;
+        rt.sizeDelta = new Vector2(500f, PanelHeight);
+
+        RectTransform back = panel.Find("Arkaplan") as RectTransform;
+        if (back != null)
+            back.sizeDelta = new Vector2(500f, PanelHeight);
+
+        RectTransform title = panel.Find("Baslik") as RectTransform;
+        if (title != null)
+            title.anchoredPosition = new Vector2(0f, 50f);
+
+        RectTransform score = panel.Find("Skor") as RectTransform;
+        if (score != null)
         {
-            Transform counter = can.Find("Tezgah");
-            if (counter != null)
-            {
-                float dx = CanCounterX - counter.position.x;
-                if (Mathf.Abs(dx) > 0.01f)
-                {
-                    foreach (Transform child in can)
-                    {
-                        string n = child.name;
-                        if (n == "Tezgah" || n == "Tezgah_Ust" || n == "Tente" || n == "Atis_Cizgisi" ||
-                            n.StartsWith("Kenar_") || n.StartsWith("Top_"))
-                            child.position += new Vector3(dx, 0f, 0f);
-                    }
-                }
-            }
-
-            DeleteChildren(can, "Panel", "Panel_Ayagi", "Panel_Arka", "Kutular", "Kule_Tepesi");
-            CanGame cg = can.GetComponent<CanGame>();
-            BuildCanTower(can, cg);
-            cg.howToPlay = CanHowTo;
-            BuildPanel(cg, can, CanPanelPos, 90f, new Color(0.15f, 0.4f, 0.2f));
+            score.anchoredPosition = new Vector2(0f, -45f);
+            score.sizeDelta = new Vector2(480f, 90f);
+            TextMeshProUGUI tmp = score.GetComponent<TextMeshProUGUI>();
+            if (tmp != null)
+                tmp.fontSize = 64f;
         }
 
-        // Kapı: güney duvarında gerçek bir boşluk + açılıp kapanan kapı + arkasında boş oda.
-        Transform room = root.Find("Oda");
-        if (room != null)
-            DeleteChildren(room, "Duvar_Guney", "Supurgelik_G", "Serit_G", "Kapi", "Kapi_Tokmak");
-        DeleteChildren(root, "KAPI", "ATARI_MAKINESI");
-        BuildDoor(root);
-        BuildArcadeMachine(root);
+        Transform backing = booth.Find("Panel_Arka");
+        if (backing != null)
+        {
+            Vector3 s = backing.localScale;
+            backing.localScale = new Vector3(s.x, PanelHeight * rt.localScale.y + 0.04f, s.z);
+        }
 
-        Save(scene, "Oda yerinde güncellendi (tabelalar ve renkler korundu).");
+        MiniGame game = booth.GetComponent<MiniGame>();
+        if (game != null)
+            EditorUtility.SetDirty(game);
     }
 
     // ================================================================ SIFIRDAN KURULUM
@@ -211,7 +223,6 @@ public static class GameRoomBuilder
         BuildBasketball(root, basketFx);
         BuildDuckGame(root, duckFx);
         BuildCanGame(root, canFx);
-        BuildArcadeMachine(root);
 
         Save(scene, "Oyun odası sıfırdan kuruldu ve sahne kaydedildi.");
     }
@@ -301,7 +312,6 @@ public static class GameRoomBuilder
         Door door = hinge.gameObject.AddComponent<Door>();
         door.leaf = interactable;
 
-        Sign("Kapi_Yazi", g, "KAPIYI TUT: AÇ / KAPAT", new Vector3((DoorLeft + DoorRight) / 2f, Y0 + DoorHeight + 0.2f, -5.98f), 180f, 1.2f, Color.black);
 
         // Kapının arkasındaki boş oda.
         Transform empty = Group("Bos_Oda", g, Vector3.zero);
@@ -313,54 +323,6 @@ public static class GameRoomBuilder
         Box("Duvar_Guney", empty, new Vector3(midX, cy, back - 0.1f), new Vector3(3.4f, h, 0.2f), wall);
     }
 
-    // ---------------------------------------------------------------- ATARİ MAKİNESİ (süs)
-
-    static void BuildArcadeMachine(Transform root)
-    {
-        // Batı duvarının güney köşesinde, oyuncuya (+X) bakar.
-        Transform g = Group("ATARI_MAKINESI", root, new Vector3(-6.55f, Y0, -4.6f));
-        Material body = Mat("Atari_Govde", Purple);
-        Material black = Mat("Siyah", Color.black);
-        Material yellow = Mat("Atari_Sari", Yellow);
-        const float z = -4.6f;
-
-        Box("Govde", g, new Vector3(-6.6f, Y0 + 0.85f, z), new Vector3(0.7f, 1.7f, 0.75f), body);
-        Box("Cerceve", g, new Vector3(-6.24f, Y0 + 1.35f, z), new Vector3(0.04f, 0.5f, 0.62f), black, false);
-        GameObject screen = Box("Ekran", g, new Vector3(-6.215f, Y0 + 1.35f, z), new Vector3(0.01f, 0.42f, 0.54f), UnlitMat("Atari_Ekran", new Color(0.05f, 0.05f, 0.35f)), false);
-
-        Transform center = Group("Ekran_Merkez", g, new Vector3(-6.205f, Y0 + 1.35f, z));
-        center.rotation = Quaternion.Euler(0f, 90f, 0f); // yerel X/Y ekran düzleminde, Z oyuncuya doğru
-        GameObject pixel = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        pixel.name = "Piksel";
-        Object.DestroyImmediate(pixel.GetComponent<Collider>());
-        pixel.transform.SetParent(center, false);
-        pixel.transform.localScale = Vector3.one * 0.03f;
-        pixel.GetComponent<Renderer>().sharedMaterial = UnlitMat("Atari_Piksel", Color.white);
-
-        GameObject blink = Sign("Jeton_Yazi", g, "JETON AT", new Vector3(-6.2f, Y0 + 1.2f, z), -90f, 1f, Yellow);
-
-        Box("Kontrol_Paneli", g, new Vector3(-6.12f, Y0 + 1.0f, z), new Vector3(0.26f, 0.08f, 0.72f), body);
-        Prim(PrimitiveType.Cylinder, "Kol_Cubuk", g, new Vector3(-6.1f, Y0 + 1.1f, z - 0.18f), new Vector3(0.02f, 0.06f, 0.02f), black, false);
-        Prim(PrimitiveType.Sphere, "Kol_Top", g, new Vector3(-6.1f, Y0 + 1.17f, z - 0.18f), Vector3.one * 0.06f, Mat("Kirmizi", Red), false);
-        Material[] buttons = { Mat("Kirmizi", Red), yellow, Mat("Mavi", Blue) };
-        for (int i = 0; i < 3; i++)
-            Prim(PrimitiveType.Cylinder, "Tus_" + i, g, new Vector3(-6.1f, Y0 + 1.045f, z + 0.05f + i * 0.1f), new Vector3(0.05f, 0.01f, 0.05f), buttons[i], false);
-
-        Box("Ust_Tabela", g, new Vector3(-6.5f, Y0 + 1.85f, z), new Vector3(0.6f, 0.3f, 0.75f), yellow);
-        Sign("Ust_Yazi", g, "ATARİ", new Vector3(-6.19f, Y0 + 1.85f, z), -90f, 2.2f, Red);
-
-        Box("Jeton_Kapagi", g, new Vector3(-6.24f, Y0 + 0.5f, z), new Vector3(0.02f, 0.2f, 0.15f), black, false);
-        Box("Jeton_Deligi", g, new Vector3(-6.228f, Y0 + 0.55f, z), new Vector3(0.01f, 0.05f, 0.015f), Mat("Kirmizi", Red), false);
-        for (int s = -1; s <= 1; s += 2)
-            Box("Yan_Serit_" + s, g, new Vector3(-6.6f, Y0 + 1.5f, z + s * 0.38f), new Vector3(0.6f, 0.06f, 0.01f), yellow, false);
-
-        ArcadeScreen anim = g.gameObject.AddComponent<ArcadeScreen>();
-        anim.screen = screen.GetComponent<Renderer>();
-        anim.pixel = pixel.transform;
-        anim.blinkText = blink;
-        anim.bounds = new Vector2(0.25f, 0.19f);
-    }
-
     // ---------------------------------------------------------------- BASKETBOL
 
     static readonly Vector3 BasketPanelPos = new Vector3(-6.97f, Y0 + 2.15f, 1.3f);
@@ -370,7 +332,6 @@ public static class GameRoomBuilder
         Transform booth = Group("BASKETBOL", root, new Vector3(-4f, 1f, 0.5f));
         BasketballGame game = booth.gameObject.AddComponent<BasketballGame>();
         game.gameTitle = "BASKETBOL";
-        game.howToPlay = "Topu al ve potaya at!\nHer basket 1 puan.";
         game.popupColor = new Color(1f, 0.6f, 0.1f);
         game.hitEffect = fx;
 
@@ -441,7 +402,6 @@ public static class GameRoomBuilder
 
     // ---------------------------------------------------------------- ÖRDEK AVI
 
-    const string DuckHowTo = "Büyük ördeklere top at!\nAlt sıra 1, üst sıra 2 puan.";
     static readonly Vector3 DuckPanelPos = new Vector3(1f, Y0 + 2.8f, 7.68f);
     const float DuckRailZ = 6.4f;
 
@@ -450,7 +410,6 @@ public static class GameRoomBuilder
         Transform booth = Group("ORDEK_AVI", root, new Vector3(1f, 1f, 6f));
         DuckGame game = booth.gameObject.AddComponent<DuckGame>();
         game.gameTitle = "ÖRDEK AVI";
-        game.howToPlay = DuckHowTo;
         game.popupColor = Yellow;
         game.hitEffect = fx;
 
@@ -480,34 +439,47 @@ public static class GameRoomBuilder
         BuildPanel(game, booth, DuckPanelPos, 0f, new Color(0.1f, 0.3f, 0.55f));
     }
 
-    // Süper kolay: 2 sıra x 2 ördek, 1.7 kat büyük, yavaş, tezgaha daha yakın.
+    static float DuckRailY(int row) => Y0 + 0.6f + row * 0.75f;
+
+    // Raylar ve dalgalar (2 sıra).
     static void BuildDuckTargets(Transform booth)
     {
         Material wood = Mat("Tahta", Wood);
         Material water = Mat("Su", LightBlue);
-        const float size = 1.7f;
-
-        Transform ducks = Group("Ordekler", booth, new Vector3(1f, 0f, DuckRailZ));
-        float[] speeds = { 0.45f, 0.6f };
-        const float track = 4.8f;
-        const float gap = 2.4f;
 
         for (int row = 0; row < 2; row++)
         {
-            float railY = Y0 + 0.6f + row * 0.75f;
+            float railY = DuckRailY(row);
 
             Box("Ray_" + row, booth, new Vector3(1f, railY - 0.04f, DuckRailZ), new Vector3(5.8f, 0.08f, 0.14f), wood);
             Box("Dalga_" + row, booth, new Vector3(1f, railY + 0.02f, DuckRailZ - 0.32f), new Vector3(5.8f, 0.2f, 0.03f), water);
             for (int w = 0; w < 7; w++)
                 Prim(PrimitiveType.Sphere, "Dalga_Tepe_" + row + "_" + w, booth,
                     new Vector3(-1.7f + w * 0.9f, railY + 0.12f, DuckRailZ - 0.32f), new Vector3(0.36f, 0.14f, 0.03f), water, false);
+        }
 
-            for (int k = 0; k < 2; k++)
+        BuildDucks(booth);
+    }
+
+    // Kolay: 2 sıra x 3 büyük (1.7x), yavaş ördek. Her sıra grup halinde gidip gelir, birbirine girmez.
+    static void BuildDucks(Transform booth)
+    {
+        const float size = 1.7f;
+        const int perRow = 3;
+        const float track = 4.8f;
+        const float gap = 1.5f;
+        float[] speeds = { 0.45f, 0.6f };
+
+        Transform ducks = Group("Ordekler", booth, new Vector3(1f, 0f, DuckRailZ));
+        for (int row = 0; row < 2; row++)
+        {
+            float railY = DuckRailY(row);
+            for (int k = 0; k < perRow; k++)
             {
                 float minX = -track / 2f + k * gap;
-                float maxX = minX + track - gap;
+                float maxX = minX + track - (perRow - 1) * gap;
                 BuildDuck(ducks, "Ordek_" + row + "_" + k, new Vector3(1f + minX, railY, DuckRailZ),
-                    minX, maxX, speeds[row], row * 1.2f, row + 1, size);
+                    minX, maxX, speeds[row], row * 0.9f, row + 1, size);
             }
         }
     }
@@ -569,7 +541,6 @@ public static class GameRoomBuilder
 
     // ---------------------------------------------------------------- KUTU DEVİRME
 
-    const string CanHowTo = "Kutuları masadan düşür!\nHer kutu 1 puan, hepsi düşerse +3.";
     static readonly Vector3 CanPanelPos = new Vector3(6.64f, Y0 + 2.5f, 1f);
     static readonly Vector3 CanTablePos = new Vector3(5.9f, 0f, 1f);
     const float CanTableHeight = 0.9f;
@@ -579,7 +550,6 @@ public static class GameRoomBuilder
         Transform booth = Group("KUTU_DEVIRME", root, new Vector3(4.5f, 1f, 1f));
         CanGame game = booth.gameObject.AddComponent<CanGame>();
         game.gameTitle = "KUTU DEVİRME";
-        game.howToPlay = CanHowTo;
         game.popupColor = new Color(0.3f, 1f, 0.4f);
         game.hitEffect = fx;
 
@@ -667,25 +637,21 @@ public static class GameRoomBuilder
         canvas.renderMode = RenderMode.WorldSpace;
 
         RectTransform rt = (RectTransform)go.transform;
-        rt.sizeDelta = new Vector2(500f, 400f);
+        rt.sizeDelta = new Vector2(500f, PanelHeight);
         rt.position = pos;
         rt.rotation = Quaternion.Euler(0f, yaw, 0f);
         rt.localScale = Vector3.one * PanelScale;
 
-        Image back = UIImage("Arkaplan", rt, Vector2.zero, new Vector2(500f, 400f), bg);
+        Image back = UIImage("Arkaplan", rt, Vector2.zero, new Vector2(500f, PanelHeight), bg);
         Outline outline = back.gameObject.AddComponent<Outline>();
         outline.effectColor = Yellow;
         outline.effectDistance = new Vector2(8f, -8f);
 
-        game.titleText = UIText("Baslik", rt, new Vector2(0f, 150f), new Vector2(480f, 70f), 50f, Yellow, game.gameTitle);
-        game.scoreText = UIText("Skor", rt, new Vector2(0f, 82f), new Vector2(480f, 60f), 48f, Color.white, "SKOR: 0");
-        game.timeText = UIText("Sure", rt, new Vector2(0f, 25f), new Vector2(480f, 60f), 44f, Color.white, "SÜRE: " + game.duration);
-        game.bestText = UIText("Rekor", rt, new Vector2(0f, -25f), new Vector2(480f, 40f), 30f, new Color(1f, 0.9f, 0.6f), "REKOR: 0");
-        game.infoText = UIText("Bilgi", rt, new Vector2(0f, -120f), new Vector2(460f, 140f), 26f, Color.white, game.howToPlay);
-        game.infoText.textWrappingMode = TextWrappingModes.Normal;
+        game.titleText = UIText("Baslik", rt, new Vector2(0f, 50f), new Vector2(480f, 70f), 50f, Yellow, game.gameTitle);
+        game.scoreText = UIText("Skor", rt, new Vector2(0f, -45f), new Vector2(480f, 90f), 64f, Color.white, "SKOR: 0");
 
         Vector3 behind = rt.rotation * Vector3.forward * 0.015f;
-        Prim(PrimitiveType.Cube, "Panel_Arka", parent, pos + behind, new Vector3(500f * PanelScale + 0.04f, 400f * PanelScale + 0.04f, 0.02f),
+        Prim(PrimitiveType.Cube, "Panel_Arka", parent, pos + behind, new Vector3(500f * PanelScale + 0.04f, PanelHeight * PanelScale + 0.04f, 0.02f),
             Mat("Tahta", Wood), false, new Vector3(0f, yaw, 0f));
 
         EditorUtility.SetDirty(game);

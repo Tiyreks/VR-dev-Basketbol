@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// Basketbol: potadaki BasketDetector her basket attığında oyun açıksa 1 puan verir.
+// Basketbol: potadaki BasketDetector her basket attığında 1 puan verir.
 public class BasketballGame : MiniGame
 {
     public BasketDetector detector;
@@ -16,11 +16,5 @@ public class BasketballGame : MiniGame
     private void OnBasket()
     {
         AddScore(1, detector.transform.position + Vector3.up * 0.6f);
-    }
-
-    protected override void OnGameStarted()
-    {
-        if (detector != null)
-            detector.ResetScore();
     }
 }

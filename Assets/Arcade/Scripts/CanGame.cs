@@ -58,12 +58,8 @@ public class CanGame : MiniGame
 
         if (down == cans.Length)
         {
-            if (IsRunning)
-            {
-                Vector3 top = towerTop != null ? towerTop.position : transform.position + Vector3.up;
-                AddScore(allDownBonus, top + Vector3.up * 0.3f);
-                ShowInfo("HEPSİ DÜŞTÜ! +" + allDownBonus, 2f);
-            }
+            Vector3 top = towerTop != null ? towerTop.position : transform.position + Vector3.up;
+            AddScore(allDownBonus, top + Vector3.up * 0.3f);
 
             rebuildTimer = 1.5f;
             return;
@@ -84,11 +80,5 @@ public class CanGame : MiniGame
             can.ResetCan();
 
         ArcadeSound.Play(ArcadeSound.Kind.Ticket, transform.position, 0.5f);
-    }
-
-    // Tur, ilk düşen kutuyla başladığı için başlangıçta kule bozulmaz; tur bitince yeniden dizilir.
-    protected override void OnGameEnded()
-    {
-        RebuildTower();
     }
 }
